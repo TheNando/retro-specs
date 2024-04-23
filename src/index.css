@@ -1,0 +1,18 @@
+:root:has(
+    :is(
+        .modal-open,
+        .modal:target,
+        .modal-toggle:checked + .modal,
+        .modal[open]
+      )
+  ) {
+  scrollbar-gutter: auto;
+}
+
+.circle-icon {
+  background: white;
+  border-radius: 20px;
+  height: 32px;
+  padding: 5px;
+  width: 32px;
+}
