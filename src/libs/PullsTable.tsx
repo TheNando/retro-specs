@@ -1,5 +1,6 @@
 import { GitHubCliError } from "../client/githubGraphql";
 import type { PullRequest } from "../client/getPullRequests";
+import type { PrRange } from "../client/prRange";
 import { usePullRequestsQuery } from "../client/queries/usePullRequestsQuery";
 import { repo } from "./utils";
 
@@ -14,29 +15,52 @@ const getStatusPriority = (pull: PullRequest): string => {
 const badgeClass = (status: string) =>
   [
     "badge",
-    status === "failed" ? "badge-error" : status === "reviewed" ? "badge-success" : status === "comments" ? "badge-info" : status === "passed" ? "badge-ghost" : "badge-neutral",
+    status === "failed"
+      ? "badge-error"
+      : status === "reviewed"
+        ? "badge-success"
+        : status === "comments"
+          ? "badge-info"
+          : status === "passed"
+            ? "badge-ghost"
+            : "badge-neutral",
   ].join(" ");
 
 const errorMessage = (error: unknown) => {
   if (error instanceof GitHubCliError && error.code === "GH_UNAUTHORIZED") {
     return "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Repo Snitch.";
   }
-  return error instanceof Error ? error.message : "Unable to load pull requests.";
+  return error instanceof Error
+    ? error.message
+    : "Unable to load pull requests.";
 };
 
-export const PullsTable = () => {
+type PullsTableProps = {
+  range: PrRange;
+};
+
+export const PullsTable = ({ range }: PullsTableProps) => {
   const repository = repo.value;
-  const { data: pulls, error, isFetching, refetch } = usePullRequestsQuery(repository);
+  const {
+    data: pulls,
+    error,
+    isFetching,
+    refetch,
+  } = usePullRequestsQuery(repository, range);
 
   const [owner, repoName] = repository.split("/");
-  const prUrl = (number: number) => `https://github.com/${owner}/${repoName}/pull/${number}`;
-  const prFilesUrl = (number: number) => `https://github.com/${owner}/${repoName}/pull/${number}/files`;
+  const prUrl = (number: number) =>
+    `https://github.com/${owner}/${repoName}/pull/${number}`;
+  const prFilesUrl = (number: number) =>
+    `https://github.com/${owner}/${repoName}/pull/${number}/files`;
 
   return (
     <div class="card bg-base-300 shadow-xl col-span-4">
       <div class="card-body">
         {!repository.trim() ? (
-          <p class="text-base-content/70">Enter a repository above to load its open pull requests.</p>
+          <p class="text-base-content/70">
+            Enter a repository above to load its open pull requests.
+          </p>
         ) : error ? (
           <div class="alert alert-error">
             <span>{errorMessage(error)}</span>
@@ -46,7 +70,10 @@ export const PullsTable = () => {
           </div>
         ) : isFetching && !pulls ? (
           <div class="flex justify-center py-8">
-            <span class="loading loading-spinner loading-md" aria-label="Loading pull requests" />
+            <span
+              class="loading loading-spinner loading-md"
+              aria-label="Loading pull requests"
+            />
           </div>
         ) : (
           <table class="table">
@@ -65,7 +92,12 @@ export const PullsTable = () => {
                 return (
                   <tr key={pull.id}>
                     <td>
-                      <a href={prUrl(pull.id)} target="_blank" rel="noopener noreferrer" class="link link-primary">
+                      <a
+                        href={prUrl(pull.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link link-primary"
+                      >
                         #{pull.id}
                       </a>
                     </td>
@@ -77,7 +109,11 @@ export const PullsTable = () => {
                       </div>
                     </td>
                     <td>
-                      <a href={prFilesUrl(pull.id)} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={prFilesUrl(pull.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <span class={badgeClass(status)}>{status}</span>
                       </a>
                     </td>

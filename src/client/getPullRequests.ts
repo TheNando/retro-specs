@@ -1,4 +1,5 @@
 import { githubGraphql } from "./githubGraphql";
+import { getRangeLimit, getRangeStart, type PrRange } from "./prRange";
 
 export type PullRequest = {
   id: number;
@@ -14,16 +15,17 @@ type PullRequestNode = {
   number: number;
   title: string;
   headRefName: string | null;
-  author: { avatarUrl: string } | null;
-  comments: { totalCount: number };
-  reviews: { totalCount: number };
-  reviewThreads: { totalCount: number };
-  commits: { nodes: Array<{ commit: { statusCheckRollup: { state: string } | null } }> };
+  author: { avatarUrl: string; } | null;
+  comments: { totalCount: number; };
+  reviews: { totalCount: number; };
+  reviewThreads: { totalCount: number; };
+  updatedAt: string;
+  commits: { nodes: Array<{ commit: { statusCheckRollup: { state: string; } | null; }; }>; };
 };
 
 type PullRequestPage = {
   nodes: PullRequestNode[];
-  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  pageInfo: { hasNextPage: boolean; endCursor: string | null; };
 };
 
 const pullRequestsQuery = `
@@ -39,6 +41,7 @@ const pullRequestsQuery = `
           comments { totalCount }
           reviews { totalCount }
           reviewThreads(first: 1) { totalCount }
+          updatedAt
           commits(last: 1) {
             nodes { commit { statusCheckRollup { state } } }
           }
@@ -61,24 +64,27 @@ const parseRepository = (repository: string) => {
   return { owner, name };
 };
 
-export const getPullRequests = async (repository: string): Promise<PullRequest[]> => {
+export const getPullRequests = async (repository: string, range: PrRange): Promise<PullRequest[]> => {
   const { owner, name } = parseRepository(repository);
   const pulls: PullRequestNode[] = [];
+  const since = getRangeStart(range);
+  const limit = getRangeLimit(range);
   let after: string | undefined;
 
   do {
-    const data = await githubGraphql<{ data: { repository: { pullRequests: PullRequestPage } | null } }>(pullRequestsQuery, {
+    const data = await githubGraphql<{ data: { repository: { pullRequests: PullRequestPage; } | null; }; }>(pullRequestsQuery, {
       owner,
       name,
-      first: 100,
+      first: limit ?? 100,
       after,
     });
 
     if (!data.data.repository) throw new Error(`Repository ${repository} was not found or is inaccessible.`);
 
-    pulls.push(...data.data.repository.pullRequests.nodes);
-    const { pageInfo } = data.data.repository.pullRequests;
-    after = pageInfo.hasNextPage ? pageInfo.endCursor ?? undefined : undefined;
+    const page = data.data.repository.pullRequests;
+    pulls.push(...page.nodes.filter((pull) => !since || new Date(pull.updatedAt) > since));
+    const hasPrsInRange = !since || page.nodes.some((pull) => new Date(pull.updatedAt) > since);
+    after = !limit && hasPrsInRange && page.pageInfo.hasNextPage ? page.pageInfo.endCursor ?? undefined : undefined;
   } while (after);
 
   return pulls.map((pull) => ({
