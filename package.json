@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@preact/signals": "^1.2.3",
+    "@tanstack/react-query": "^5.101.2",
+    "graphql-request": "^7.4.0",
     "preact": "^10.19.6"
   },
   "devDependencies": {
