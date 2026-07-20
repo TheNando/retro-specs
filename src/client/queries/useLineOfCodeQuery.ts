@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { getPullRequests } from "../getPullRequests";
+import { getLineOfCode } from "../getLineOfCode";
 import type { PrRange } from "../prRange";
 import { isRepository, rememberRepository } from "../repositoryHistory";
 
-export const usePullRequestsQuery = (repository: string, range: PrRange) =>
+export const useLineOfCodeQuery = (repository: string, range: PrRange) =>
   useQuery({
-    queryKey: ["github", "pull-requests", repository, range],
+    queryKey: ["github", "line-of-code", repository, range],
     queryFn: async () => {
-      const pulls = await getPullRequests(repository, range);
+      const stats = await getLineOfCode(repository, range);
       rememberRepository(repository);
-      return pulls;
+      return stats;
     },
     enabled: isRepository(repository),
   });

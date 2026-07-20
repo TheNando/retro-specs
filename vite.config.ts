@@ -11,7 +11,7 @@ type GraphqlRequest = {
 };
 
 const unauthorizedMessage =
-  "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Repo Snitch.";
+  "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Retro Specs.";
 
 const sendJson = (res: import("node:http").ServerResponse, status: number, body: unknown) => {
   res.statusCode = status;

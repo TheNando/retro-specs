@@ -4,7 +4,7 @@ export const ConfigModal = () => (
       <h3 class="font-bold text-lg">Configuration</h3>
 
       <p class="py-4">
-        Repo Snitch uses your existing GitHub CLI authentication.
+        Retro Specs uses your existing GitHub CLI authentication.
         <br />
         Run <code>gh auth login</code> in a terminal if GitHub access is
         unavailable.

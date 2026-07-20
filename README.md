@@ -1,6 +1,6 @@
-# Repo Snitch
+# Retro Specs
 
-Repo Snitch is a local dashboard for checking a GitHub repository's pull requests. Enter an `owner/repository` name, then inspect open work or activity summaries.
+Retro Specs is a local dashboard for checking a GitHub repository's pull requests. Enter an `owner/repository` name, then inspect open work or activity summaries.
 
 The browser never receives a GitHub token. During development, Vite forwards GraphQL requests to the locally installed GitHub CLI, which uses the account authenticated by `gh auth login`.
 
@@ -10,13 +10,15 @@ The browser never receives a GitHub token. During development, Vite forwards Gra
 
 **Merged** groups merged pull requests by author and renders a bar chart. The authenticated viewer is outlined in the chart.
 
+**LoC** shows each author's average additions and deletions per merged pull request. Additions are green and extend above zero; deletions are red and extend below it.
+
 **Reviews** counts two review types on merged PRs: comments, including requested changes, and approvals. For each reviewer and PR, any number of comments or requested changes adds one comment count; any number of approvals adds one approval count. A reviewer can count once in both categories for the same PR.
 
 Activity charts anonymize contributors other than the authenticated GitHub user. The viewer's GitHub login stays visible and their bar is outlined.
 
 Available ranges are today, last week, last month, last 50, and last 100. Time-based ranges use the pull request's `updatedAt` value. The last-50 and last-100 options cap the query instead.
 
-The selected repository and view settings are kept in `localStorage`, so they'll still be there after a refresh.
+The selected repository and view settings are kept in `localStorage`, so they'll still be there after a refresh. Successfully queried repositories are also saved as a history that the repository combobox autocompletes while you type.
 
 ## Requirements
 
@@ -76,9 +78,9 @@ Preact renders the UI. TanStack Query caches requests, while Recharts draws the 
 
 ## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `bun install` | Install the project's dependencies. |
-| `bun run dev` | Start the local dashboard and GitHub CLI proxy. |
-| `bun run build` | Type-check and create a production build. |
+| Command           | Purpose                                                                   |
+| ----------------- | ------------------------------------------------------------------------- |
+| `bun install`     | Install the project's dependencies.                                       |
+| `bun run dev`     | Start the local dashboard and GitHub CLI proxy.                           |
+| `bun run build`   | Type-check and create a production build.                                 |
 | `bun run preview` | Serve the built static assets. GitHub data requires a separate API proxy. |

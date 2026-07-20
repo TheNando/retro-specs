@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import { prRanges, type PrRange } from "./client/prRange";
 import { ConfigModal } from "./libs/ConfigModal";
+import { LineOfCodeChart } from "./libs/LineOfCodeChart";
 import { MergedPrsChart } from "./libs/MergedPrsChart";
 import { Nav } from "./libs/Nav";
 import { PullsTable } from "./libs/PullsTable";
@@ -19,7 +20,7 @@ const savedRange = () => {
 
 const savedTab = (): TableTab => {
   const value = window.localStorage.getItem(tabStorageKey);
-  return value === "merged-prs" || value === "reviews" ? value : "pulls";
+  return value === "merged-prs" || value === "reviews" || value === "loc" ? value : "pulls";
 };
 
 export const App = () => {
@@ -50,6 +51,8 @@ export const App = () => {
             <PullsTable range={range} />
           ) : activeTab === "merged-prs" ? (
             <MergedPrsChart range={range} />
+          ) : activeTab === "loc" ? (
+            <LineOfCodeChart range={range} />
           ) : (
             <ReviewsChart range={range} />
           )}

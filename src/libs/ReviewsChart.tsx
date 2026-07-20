@@ -18,7 +18,7 @@ import { repo } from "./utils";
 
 const errorMessage = (error: unknown) => {
   if (error instanceof GitHubCliError && error.code === "GH_UNAUTHORIZED") {
-    return "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Repo Snitch.";
+    return "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Retro Specs.";
   }
   return error instanceof Error
     ? error.message

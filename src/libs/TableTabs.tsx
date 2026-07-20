@@ -1,7 +1,7 @@
 import type { JSX } from "preact/jsx-runtime";
 import { prRanges, type PrRange } from "../client/prRange";
 
-export type TableTab = "pulls" | "merged-prs" | "reviews";
+export type TableTab = "pulls" | "merged-prs" | "reviews" | "loc";
 
 type TableTabsProps = {
   activeTab: TableTab;
@@ -44,6 +44,13 @@ export const TableTabs = ({
             onClick={() => onSelect("reviews")}
           >
             Reviews
+          </button>
+          <button
+            role="tab"
+            class={`tab ${activeTab === "loc" ? "tab-active" : ""}`}
+            onClick={() => onSelect("loc")}
+          >
+            LoC
           </button>
         </div>
         <select

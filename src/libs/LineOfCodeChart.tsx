@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import { useMemo } from "preact/hooks";
 import { GitHubCliError } from "../client/githubGraphql";
-import { useMergedPullRequestsQuery } from "../client/queries/useMergedPullRequestsQuery";
+import { useLineOfCodeQuery } from "../client/queries/useLineOfCodeQuery";
 import { useViewerQuery } from "../client/queries/useViewerQuery";
 import type { PrRange } from "../client/prRange";
 import { getMoniker } from "./monikers";
@@ -21,46 +21,47 @@ const errorMessage = (error: unknown) => {
   }
   return error instanceof Error
     ? error.message
-    : "Unable to load merged pull requests.";
+    : "Unable to load line of code statistics.";
 };
 
-type MergedPrsChartProps = {
+type LineOfCodeChartProps = {
   range: PrRange;
 };
 
-export const MergedPrsChart = ({ range }: MergedPrsChartProps) => {
+const formatLines = (value: number) => Math.round(Math.abs(value)).toLocaleString();
+
+export const LineOfCodeChart = ({ range }: LineOfCodeChartProps) => {
   const repository = repo.value;
   const {
-    data: pulls,
+    data: stats,
     error,
     isFetching,
     refetch,
-  } = useMergedPullRequestsQuery(repository, range);
+  } = useLineOfCodeQuery(repository, range);
   const { data: viewer } = useViewerQuery();
   const useOriginalNames = window.localStorage.getItem("pr_origin") === "true";
   const data = useMemo(() => {
     const monikers = new Map<string, string>();
-    return pulls?.map((pull) => {
-      const isViewer = pull.author === viewer?.login;
-      if (useOriginalNames)
-        return { name: pull.name ?? pull.author, prs: pull.prs, isViewer };
-      if (!isViewer && !monikers.has(pull.author))
-        monikers.set(pull.author, getMoniker(pull.author));
+    return stats?.map((stat) => {
+      const isViewer = stat.author === viewer?.login;
+      if (!isViewer && !useOriginalNames && !monikers.has(stat.author))
+        monikers.set(stat.author, getMoniker(stat.author));
       return {
-        name: isViewer ? pull.author : monikers.get(pull.author)!,
-        prs: pull.prs,
+        additions: stat.averageAdditions,
+        deletions: -stat.averageDeletions,
         isViewer,
+        name: useOriginalNames ? stat.name ?? stat.author : isViewer ? stat.author : monikers.get(stat.author)!,
       };
     });
-  }, [pulls, useOriginalNames, viewer?.login]);
+  }, [stats, useOriginalNames, viewer?.login]);
 
   return (
     <div class="card bg-base-300 shadow-xl col-span-4">
       <div class="card-body">
-        <h2 class="card-title">Merged</h2>
+        <h2 class="card-title">LoC</h2>
         {!repository.trim() ? (
           <p class="text-base-content/70">
-            Enter a repository above to load merged pull requests.
+            Enter a repository above to load line of code statistics.
           </p>
         ) : error ? (
           <div class="alert alert-error">
@@ -73,7 +74,7 @@ export const MergedPrsChart = ({ range }: MergedPrsChartProps) => {
           <div class="flex justify-center py-8">
             <span
               class="loading loading-spinner loading-md"
-              aria-label="Loading merged pull requests"
+              aria-label="Loading line of code statistics"
             />
           </div>
         ) : !data?.length ? (
@@ -83,20 +84,43 @@ export const MergedPrsChart = ({ range }: MergedPrsChartProps) => {
         ) : (
           <div class="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} barCategoryGap={2}>
+              <BarChart data={data} barCategoryGap={2} stackOffset="sign">
                 <XAxis
                   angle={-45}
                   dataKey="name"
                   height={70}
                   textAnchor="end"
                 />
-                <YAxis dataKey="prs" allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="prs">
+                <YAxis tickFormatter={formatLines} />
+                <Tooltip
+                  formatter={(value: number, key: string) => [
+                    formatLines(value),
+                    key === "additions" ? "Average added" : "Average removed",
+                  ]}
+                />
+                <Bar
+                  dataKey="additions"
+                  fill="#22c55e"
+                  name="Average added"
+                  stackId="lines"
+                >
                   {data.map((entry) => (
                     <Cell
-                      key={entry.name}
-                      fill="#7480ff"
+                      key={`${entry.name}-additions`}
+                      stroke={entry.isViewer ? "#fff" : undefined}
+                      strokeWidth={entry.isViewer ? 2 : 0}
+                    />
+                  ))}
+                </Bar>
+                <Bar
+                  dataKey="deletions"
+                  fill="#ef4444"
+                  name="Average removed"
+                  stackId="lines"
+                >
+                  {data.map((entry) => (
+                    <Cell
+                      key={`${entry.name}-deletions`}
                       stroke={entry.isViewer ? "#fff" : undefined}
                       strokeWidth={entry.isViewer ? 2 : 0}
                     />

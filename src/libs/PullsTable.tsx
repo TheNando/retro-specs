@@ -6,7 +6,7 @@ import { repo } from "./utils";
 
 const getStatusPriority = (pull: PullRequest): string => {
   if (pull.checksState === "failed") return "failed";
-  if (pull.hasReviews) return "reviewed";
+  if (pull.hasReviews) return "approved";
   if (pull.hasComments) return "comments";
   if (pull.checksState === "passed") return "passed";
   return "open";
@@ -15,9 +15,10 @@ const getStatusPriority = (pull: PullRequest): string => {
 const badgeClass = (status: string) =>
   [
     "badge",
+    "text-white",
     status === "failed"
       ? "badge-error"
-      : status === "reviewed"
+      : status === "approved"
         ? "badge-success"
         : status === "comments"
           ? "badge-info"
@@ -26,9 +27,12 @@ const badgeClass = (status: string) =>
             : "badge-neutral",
   ].join(" ");
 
+const statusLabel = (status: string) =>
+  `${status.charAt(0).toUpperCase()}${status.slice(1)}`;
+
 const errorMessage = (error: unknown) => {
   if (error instanceof GitHubCliError && error.code === "GH_UNAUTHORIZED") {
-    return "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Repo Snitch.";
+    return "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Retro Specs.";
   }
   return error instanceof Error
     ? error.message
@@ -81,7 +85,7 @@ export const PullsTable = ({ range }: PullsTableProps) => {
               <tr>
                 <th></th>
                 <th>User</th>
-                <th>Status</th>
+                <th class="text-center">Status</th>
                 <th>Branch</th>
                 <th>Title</th>
               </tr>
@@ -108,13 +112,13 @@ export const PullsTable = ({ range }: PullsTableProps) => {
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td class="text-center">
                       <a
                         href={prFilesUrl(pull.id)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        <span class={badgeClass(status)}>{status}</span>
+                        <span class={badgeClass(status)}>{statusLabel(status)}</span>
                       </a>
                     </td>
                     <td>{pull.branch}</td>
