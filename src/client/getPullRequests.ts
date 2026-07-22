@@ -6,20 +6,23 @@ export type PullRequest = {
   branch: string;
   title: string;
   userImg: string;
+  userLogin: string;
   checksState: "passed" | "failed" | "pending" | "none";
   hasReviews: boolean;
   hasComments: boolean;
+  createdAt: string;
 };
 
 type PullRequestNode = {
   number: number;
   title: string;
   headRefName: string | null;
-  author: { avatarUrl: string; } | null;
+  author: { login: string; avatarUrl: string; } | null;
   comments: { totalCount: number; };
   reviews: { totalCount: number; };
   reviewThreads: { totalCount: number; };
   updatedAt: string;
+  createdAt: string;
   commits: { nodes: Array<{ commit: { statusCheckRollup: { state: string; } | null; }; }>; };
 };
 
@@ -37,11 +40,12 @@ const pullRequestsQuery = `
           number
           title
           headRefName
-          author { avatarUrl }
+          author { login avatarUrl }
           comments { totalCount }
           reviews { totalCount }
           reviewThreads(first: 1) { totalCount }
           updatedAt
+          createdAt
           commits(last: 1) {
             nodes { commit { statusCheckRollup { state } } }
           }
@@ -92,8 +96,10 @@ export const getPullRequests = async (repository: string, range: PrRange): Promi
     branch: pull.headRefName ?? "(deleted branch)",
     title: pull.title,
     userImg: pull.author?.avatarUrl ?? "",
+    userLogin: pull.author?.login ?? "",
     checksState: checkState(pull.commits.nodes[0]?.commit.statusCheckRollup?.state),
     hasReviews: pull.reviews.totalCount > 0,
     hasComments: pull.comments.totalCount > 0 || pull.reviewThreads.totalCount > 0,
+    createdAt: pull.createdAt,
   }));
 };
