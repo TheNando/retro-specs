@@ -1,17 +1,25 @@
 import { githubGraphql } from "./githubGraphql";
 import { getRangeLimit, getRangeStart, type PrRange } from "./prRange";
 
+export type LineOfCodePullRequest = {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+  additions: number;
+  deletions: number;
+};
+
 export type LineOfCodeStat = {
   author: string;
   name: string | null;
   averageAdditions: number;
   averageDeletions: number;
+  pulls: LineOfCodePullRequest[];
 };
 
-type PullRequestNode = {
-  additions: number;
+type PullRequestNode = LineOfCodePullRequest & {
   author: { login: string; name?: string | null; } | null;
-  deletions: number;
   updatedAt: string;
 };
 
@@ -26,6 +34,10 @@ const lineOfCodeQuery = `
       pullRequests(states: MERGED, first: $first, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
         pageInfo { hasNextPage endCursor }
         nodes {
+          number
+          title
+          url
+          mergedAt
           additions
           author { login ... on User { name } }
           deletions
@@ -66,7 +78,13 @@ export const getLineOfCode = async (
     after = !limit && hasPrsInRange && page.pageInfo.hasNextPage ? page.pageInfo.endCursor ?? undefined : undefined;
   } while (after);
 
-  const stats = new Map<string, { additions: number; deletions: number; name: string | null; prs: number; }>();
+  const stats = new Map<string, {
+    additions: number;
+    deletions: number;
+    name: string | null;
+    prs: number;
+    pulls: LineOfCodePullRequest[];
+  }>();
   for (const pull of pulls) {
     if (!pull.author) continue;
     const stat = stats.get(pull.author.login) ?? {
@@ -74,10 +92,19 @@ export const getLineOfCode = async (
       deletions: 0,
       name: pull.author.name ?? null,
       prs: 0,
+      pulls: [],
     };
     stat.additions += pull.additions;
     stat.deletions += pull.deletions;
     stat.prs += 1;
+    stat.pulls.push({
+      number: pull.number,
+      title: pull.title,
+      url: pull.url,
+      mergedAt: pull.mergedAt,
+      additions: pull.additions,
+      deletions: pull.deletions,
+    });
     stats.set(pull.author.login, stat);
   }
 
@@ -87,6 +114,7 @@ export const getLineOfCode = async (
       name: stat.name,
       averageAdditions: stat.additions / stat.prs,
       averageDeletions: stat.deletions / stat.prs,
+      pulls: stat.pulls,
     }))
     .sort((a, b) => b.averageAdditions + b.averageDeletions - (a.averageAdditions + a.averageDeletions));
 };

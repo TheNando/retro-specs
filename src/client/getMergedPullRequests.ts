@@ -1,13 +1,21 @@
 import { githubGraphql } from "./githubGraphql";
 import { getRangeLimit, getRangeStart, type PrRange } from "./prRange";
 
+export type MergedPullRequest = {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+};
+
 export type MergedPullRequestStat = {
   author: string;
   name: string | null;
   prs: number;
+  pulls: MergedPullRequest[];
 };
 
-type PullRequestNode = {
+type PullRequestNode = MergedPullRequest & {
   author: { login: string; name?: string | null; } | null;
   updatedAt: string;
 };
@@ -24,6 +32,10 @@ const mergedPullRequestsQuery = `
         pageInfo { hasNextPage endCursor }
         nodes {
           author { login ... on User { name } }
+          number
+          title
+          url
+          mergedAt
           updatedAt
         }
       }
@@ -58,11 +70,12 @@ export const getMergedPullRequests = async (repository: string, range: PrRange):
     after = !limit && hasPrsInRange && page.pageInfo.hasNextPage ? page.pageInfo.endCursor ?? undefined : undefined;
   } while (after);
 
-  const stats = new Map<string, { name: string | null; prs: number; }>();
+  const stats = new Map<string, { name: string | null; prs: number; pulls: MergedPullRequest[]; }>();
   for (const pull of pulls) {
     if (!pull.author) continue;
-    const stat = stats.get(pull.author.login) ?? { name: pull.author.name ?? null, prs: 0 };
+    const stat = stats.get(pull.author.login) ?? { name: pull.author.name ?? null, prs: 0, pulls: [] };
     stat.prs += 1;
+    stat.pulls.push({ number: pull.number, title: pull.title, url: pull.url, mergedAt: pull.mergedAt });
     stats.set(pull.author.login, stat);
   }
 

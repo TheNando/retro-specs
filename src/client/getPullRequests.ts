@@ -4,6 +4,7 @@ import { getRangeLimit, getRangeStart, type PrRange } from "./prRange";
 export type PullRequest = {
   id: number;
   branch: string;
+  branchUrl: string | null;
   title: string;
   userImg: string;
   userLogin: string;
@@ -11,12 +12,14 @@ export type PullRequest = {
   hasReviews: boolean;
   hasComments: boolean;
   createdAt: string;
+  updatedAt: string;
 };
 
 type PullRequestNode = {
   number: number;
   title: string;
   headRefName: string | null;
+  headRepository: { nameWithOwner: string; } | null;
   author: { login: string; avatarUrl: string; } | null;
   comments: { totalCount: number; };
   reviews: { totalCount: number; };
@@ -40,6 +43,7 @@ const pullRequestsQuery = `
           number
           title
           headRefName
+          headRepository { nameWithOwner }
           author { login avatarUrl }
           comments { totalCount }
           reviews { totalCount }
@@ -60,6 +64,12 @@ const checkState = (state: string | undefined): PullRequest["checksState"] => {
   if (["FAILURE", "ERROR"].includes(state)) return "failed";
   if (["PENDING", "EXPECTED"].includes(state)) return "pending";
   return state === "SUCCESS" ? "passed" : "none";
+};
+
+const branchUrl = (pull: PullRequestNode) => {
+  if (!pull.headRefName || !pull.headRepository) return null;
+  const branch = pull.headRefName.split("/").map(encodeURIComponent).join("/");
+  return `https://github.com/${pull.headRepository.nameWithOwner}/tree/${branch}`;
 };
 
 const parseRepository = (repository: string) => {
@@ -94,6 +104,7 @@ export const getPullRequests = async (repository: string, range: PrRange): Promi
   return pulls.map((pull) => ({
     id: pull.number,
     branch: pull.headRefName ?? "(deleted branch)",
+    branchUrl: branchUrl(pull),
     title: pull.title,
     userImg: pull.author?.avatarUrl ?? "",
     userLogin: pull.author?.login ?? "",
@@ -101,5 +112,6 @@ export const getPullRequests = async (repository: string, range: PrRange): Promi
     hasReviews: pull.reviews.totalCount > 0,
     hasComments: pull.comments.totalCount > 0 || pull.reviewThreads.totalCount > 0,
     createdAt: pull.createdAt,
+    updatedAt: pull.updatedAt,
   }));
 };

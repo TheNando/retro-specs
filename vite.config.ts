@@ -1,26 +1,12 @@
 import { defineConfig } from "vite";
 import preact from "@preact/preset-vite";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
-
-type GraphqlRequest = {
-  query?: unknown;
-  variables?: unknown;
-};
-
-const unauthorizedMessage =
-  "GitHub CLI is not authenticated. Run `gh auth login` in your terminal, then reload Retro Specs.";
+import { handleGithubGraphql } from "./server/githubGraphql";
 
 const sendJson = (res: import("node:http").ServerResponse, status: number, body: unknown) => {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(body));
 };
-
-const isUnauthorized = (message: string) =>
-  /not logged into|authentication failed|requires authentication|gh auth login/i.test(message);
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -42,33 +28,10 @@ export default defineConfig({
               req.on("end", () => resolve(body));
               req.on("error", reject);
             });
-            const { query, variables = {} } = JSON.parse(request) as GraphqlRequest;
-
-            if (typeof query !== "string" || !query.trim() || typeof variables !== "object" || variables === null) {
-              sendJson(res, 400, { message: "A GraphQL query and variables are required." });
-              return;
-            }
-
-            const args = ["api", "graphql", "--raw-field", `query=${query}`];
-            for (const [name, value] of Object.entries(variables as Record<string, string | number | boolean | undefined>)) {
-              if (value !== undefined) args.push("--field", `${name}=${value}`);
-            }
-
-            const { stdout } = await execFileAsync("gh", args, { maxBuffer: 5 * 1024 * 1024 });
-            sendJson(res, 200, JSON.parse(stdout));
+            const { status, body } = await handleGithubGraphql(request);
+            sendJson(res, status, body);
           } catch (error) {
-            const message = error instanceof Error ? error.message : "GitHub CLI failed to run.";
-            if (isUnauthorized(message)) {
-              sendJson(res, 401, { code: "GH_UNAUTHORIZED", message: unauthorizedMessage });
-              return;
-            }
-            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-              sendJson(res, 503, {
-                code: "GH_CLI_UNAVAILABLE",
-                message: "GitHub CLI (`gh`) is required. Install it and authenticate with `gh auth login`.",
-              });
-              return;
-            }
+            const message = error instanceof Error ? error.message : "Failed to read request.";
             sendJson(res, 502, { code: "GH_GRAPHQL_FAILED", message });
           }
         });

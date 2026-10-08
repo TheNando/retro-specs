@@ -3,33 +3,18 @@ import { GitHubCliError } from "../client/githubGraphql";
 import type { PullRequest } from "../client/getPullRequests";
 import type { PrRange } from "../client/prRange";
 import { usePullRequestsQuery } from "../client/queries/usePullRequestsQuery";
+import { Age } from "./Age";
+import { StatusBadge, type PullStatus } from "./StatusBadge";
+import { UserAvatar } from "./UserAvatar";
 import { repo } from "./utils";
 
-const getStatusPriority = (pull: PullRequest): string => {
+const getStatusPriority = (pull: PullRequest): PullStatus => {
   if (pull.checksState === "failed") return "failed";
   if (pull.hasReviews) return "approved";
   if (pull.hasComments) return "comments";
   if (pull.checksState === "passed") return "passed";
   return "open";
 };
-
-const badgeClass = (status: string) =>
-  [
-    "badge",
-    "text-white",
-    status === "failed"
-      ? "badge-error"
-      : status === "approved"
-        ? "badge-success"
-        : status === "comments"
-          ? "badge-info"
-          : status === "passed"
-            ? "badge-ghost"
-            : "badge-neutral",
-  ].join(" ");
-
-const statusLabel = (status: string) =>
-  `${status.charAt(0).toUpperCase()}${status.slice(1)}`;
 
 const errorMessage = (error: unknown) => {
   if (error instanceof GitHubCliError && error.code === "GH_UNAUTHORIZED") {
@@ -44,7 +29,7 @@ type PullsTableProps = {
   range: PrRange;
 };
 
-type SortColumn = "id" | "userLogin" | "status" | "branch" | "title" | "createdAt";
+type SortColumn = "id" | "userLogin" | "status" | "title" | "createdAt";
 
 const comparePulls = (a: PullRequest, b: PullRequest, column: SortColumn) => {
   if (column === "id") return a.id - b.id;
@@ -57,15 +42,8 @@ const comparePulls = (a: PullRequest, b: PullRequest, column: SortColumn) => {
   return a[column].localeCompare(b[column]);
 };
 
-const formatAge = (createdAt: string) => {
-  const diff = Math.max(0, Date.now() - new Date(createdAt).getTime());
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-  if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  return `${mins}m`;
-};
+const ageTooltip = (pull: PullRequest) =>
+  `Created: ${new Date(pull.createdAt).toLocaleString()}\nUpdated: ${new Date(pull.updatedAt).toLocaleString()}`;
 
 export const PullsTable = ({ range }: PullsTableProps) => {
   const repository = repo.value;
@@ -82,8 +60,8 @@ export const PullsTable = ({ range }: PullsTableProps) => {
   const prFilesUrl = (number: number) =>
     `https://github.com/${owner}/${repoName}/pull/${number}/files`;
 
-  const [sortBy, setSortBy] = useState<SortColumn>("id");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<SortColumn>("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const sorted = pulls?.slice().sort((a, b) => {
     const cmp = comparePulls(a, b, sortBy);
@@ -132,20 +110,12 @@ export const PullsTable = ({ range }: PullsTableProps) => {
             <thead>
               <tr>
                 <th
-                  aria-sort={sortBy === "id" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
-                  class="cursor-pointer"
-                  onClick={() => toggleSort("id")}
+                  class="text-center cursor-pointer"
+                  aria-sort={sortBy === "createdAt" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
+                  onClick={() => toggleSort("createdAt")}
                   scope="col"
                 >
-                  {sortIndicator("id")} #
-                </th>
-                <th
-                  aria-sort={sortBy === "userLogin" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
-                  class="cursor-pointer"
-                  onClick={() => toggleSort("userLogin")}
-                  scope="col"
-                >
-                  {sortIndicator("userLogin")} User
+                  {sortIndicator("createdAt")} Age
                 </th>
                 <th
                   class="text-center cursor-pointer"
@@ -156,12 +126,20 @@ export const PullsTable = ({ range }: PullsTableProps) => {
                   {sortIndicator("status")} Status
                 </th>
                 <th
-                  aria-sort={sortBy === "branch" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
+                  aria-sort={sortBy === "id" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
                   class="cursor-pointer"
-                  onClick={() => toggleSort("branch")}
+                  onClick={() => toggleSort("id")}
                   scope="col"
                 >
-                  {sortIndicator("branch")} Branch
+                  {sortIndicator("id")} # / Branch
+                </th>
+                <th
+                  aria-sort={sortBy === "userLogin" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
+                  class="text-center cursor-pointer"
+                  onClick={() => toggleSort("userLogin")}
+                  scope="col"
+                >
+                  {sortIndicator("userLogin")} User
                 </th>
                 <th
                   aria-sort={sortBy === "title" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
@@ -171,14 +149,6 @@ export const PullsTable = ({ range }: PullsTableProps) => {
                 >
                   {sortIndicator("title")} Title
                 </th>
-                <th
-                  class="cursor-pointer"
-                  aria-sort={sortBy === "createdAt" ? sortDir === "asc" ? "ascending" : "descending" : "none"}
-                  onClick={() => toggleSort("createdAt")}
-                  scope="col"
-                >
-                  {sortIndicator("createdAt")} Age
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -186,25 +156,8 @@ export const PullsTable = ({ range }: PullsTableProps) => {
                 const status = getStatusPriority(pull);
                 return (
                   <tr key={pull.id}>
-                    <td>
-                      <a
-                        href={prUrl(pull.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link link-primary"
-                      >
-                        #{pull.id}
-                      </a>
-                    </td>
-                    <td>
-                      <div class="flex items-center gap-2">
-                        <div class="avatar">
-                          <div class="w-8 rounded-full">
-                            {pull.userImg && <img src={pull.userImg} alt="" />}
-                          </div>
-                        </div>
-                        <span class="text-sm font-mono">{pull.userLogin}</span>
-                      </div>
+                    <td class="text-center">
+                      <Age date={pull.createdAt} tooltip={ageTooltip(pull)} />
                     </td>
                     <td class="text-center">
                       <a
@@ -212,12 +165,40 @@ export const PullsTable = ({ range }: PullsTableProps) => {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        <span class={badgeClass(status)}>{statusLabel(status)}</span>
+                        <StatusBadge status={status} />
                       </a>
                     </td>
-                    <td>{pull.branch}</td>
+                    <td>
+                      <div class="flex flex-col">
+                        <a
+                          href={prUrl(pull.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="link link-primary"
+                        >
+                          #{pull.id}
+                        </a>
+                        {pull.branchUrl ? (
+                          <a
+                            href={pull.branchUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="link text-sm max-w-[250px] truncate"
+                            title={pull.branch}
+                          >
+                            {pull.branch}
+                          </a>
+                        ) : (
+                          <span class="text-sm max-w-[250px] truncate" title={pull.branch}>
+                            {pull.branch}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <UserAvatar img={pull.userImg} login={pull.userLogin} />
+                    </td>
                     <td>{pull.title}</td>
-                    <td>{formatAge(pull.createdAt)}</td>
                   </tr>
                 );
               })}

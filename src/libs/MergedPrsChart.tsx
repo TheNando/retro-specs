@@ -12,8 +12,9 @@ import { GitHubCliError } from "../client/githubGraphql";
 import { useMergedPullRequestsQuery } from "../client/queries/useMergedPullRequestsQuery";
 import { useViewerQuery } from "../client/queries/useViewerQuery";
 import type { PrRange } from "../client/prRange";
+import { Age } from "./Age";
 import { getMoniker } from "./monikers";
-import { repo } from "./utils";
+import { repo, useSelectedAuthor } from "./utils";
 
 const errorMessage = (error: unknown) => {
   if (error instanceof GitHubCliError && error.code === "GH_UNAUTHORIZED") {
@@ -37,22 +38,43 @@ export const MergedPrsChart = ({ range }: MergedPrsChartProps) => {
     refetch,
   } = useMergedPullRequestsQuery(repository, range);
   const { data: viewer } = useViewerQuery();
+  const [selectedAuthor, toggleAuthor] = useSelectedAuthor(
+    "merged_selected_author",
+    viewer?.login,
+  );
   const useOriginalNames = window.localStorage.getItem("pr_origin") === "true";
   const data = useMemo(() => {
     const monikers = new Map<string, string>();
     return pulls?.map((pull) => {
       const isViewer = pull.author === viewer?.login;
       if (useOriginalNames)
-        return { name: pull.name ?? pull.author, prs: pull.prs, isViewer };
+        return {
+          author: pull.author,
+          name: pull.name ?? pull.author,
+          prs: pull.prs,
+          pulls: pull.pulls,
+          isViewer,
+        };
       if (!isViewer && !monikers.has(pull.author))
         monikers.set(pull.author, getMoniker(pull.author));
       return {
+        author: pull.author,
         name: isViewer ? pull.author : monikers.get(pull.author)!,
         prs: pull.prs,
+        pulls: pull.pulls,
         isViewer,
       };
     });
   }, [pulls, useOriginalNames, viewer?.login]);
+  const selected = data?.find((entry) => entry.author === selectedAuthor);
+  const selectedPulls = selected?.pulls
+    .slice()
+    .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt));
+  const selectStrip = (state?: { activeTooltipIndex?: number }) => {
+    const index = state?.activeTooltipIndex;
+    if (index === undefined) return;
+    toggleAuthor(data?.[index]?.author ?? null);
+  };
 
   return (
     <div class="card bg-base-300 shadow-xl col-span-4">
@@ -81,30 +103,80 @@ export const MergedPrsChart = ({ range }: MergedPrsChartProps) => {
             No merged pull requests match the selected range.
           </p>
         ) : (
-          <div class="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} barCategoryGap={2}>
-                <XAxis
-                  angle={-45}
-                  dataKey="name"
-                  height={70}
-                  textAnchor="end"
-                />
-                <YAxis dataKey="prs" allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="prs">
-                  {data.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#7480ff"
-                      stroke={entry.isViewer ? "#fff" : undefined}
-                      strokeWidth={entry.isViewer ? 2 : 0}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            <div class="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={data}
+                  barCategoryGap={2}
+                  onClick={selectStrip}
+                  style={{ cursor: "pointer" }}
+                >
+                  <XAxis
+                    angle={-45}
+                    dataKey="name"
+                    height={70}
+                    textAnchor="end"
+                  />
+                  <YAxis dataKey="prs" allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="prs">
+                    {data.map((entry) => (
+                      <Cell
+                        key={entry.name}
+                        fill={
+                          entry.author === selectedAuthor
+                            ? "#a5adff"
+                            : "#7480ff"
+                        }
+                        stroke={entry.isViewer ? "#fff" : undefined}
+                        strokeWidth={entry.isViewer ? 2 : 0}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {selected && selectedPulls && (
+              <div>
+                <h3 class="font-semibold mb-2">
+                  {selected.name} ({selectedPulls.length})
+                </h3>
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="text-center" scope="col">Merged</th>
+                      <th class="text-center" scope="col">PR</th>
+                      <th scope="col">Title</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedPulls.map((pull) => (
+                      <tr key={pull.number}>
+                        <td class="text-center">
+                          <Age
+                            date={pull.mergedAt}
+                            tooltip={`Merged: ${new Date(pull.mergedAt).toLocaleString()}`}
+                          />
+                        </td>
+                        <td class="text-center">
+                          <a
+                            href={pull.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="link link-primary"
+                          >
+                            #{pull.number}
+                          </a>
+                        </td>
+                        <td>{pull.title}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

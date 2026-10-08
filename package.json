@@ -7,6 +7,7 @@
     "dev": "bunx --bun vite",
     "buildx": "bunx --bun vite build",
     "build": "tsc && vite build",
+    "exe": "bun build --compile --minify --sourcemap --bytecode ./server/index.ts --outfile dist/retro-specs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@preact/preset-vite": "^2.8.2",
     "@types/bun": "^1.1.0",
+    "bun-types": "^1.4.2",
     "typescript": "^5.2.2",
     "vite": "^5.2.0"
   }

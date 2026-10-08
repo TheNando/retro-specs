@@ -1,22 +1,44 @@
 import { githubGraphql } from "./githubGraphql";
 import { getRangeLimit, getRangeStart, type PrRange } from "./prRange";
 
+type PullRequestAuthor = { login: string; name?: string | null; };
+
+type PullRequestOwner = PullRequestAuthor & { avatarUrl: string; };
+
+export type ReviewedPullRequest = {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+  author: PullRequestOwner | null;
+  commented: boolean;
+  approved: boolean;
+};
+
 export type ReviewedPullRequestStat = {
   author: string;
   name: string | null;
   comments: number;
   approvals: number;
+  pulls: ReviewedPullRequest[];
 };
 
 type PullRequestReview = {
-  author: { login: string; name?: string | null; } | null;
+  author: PullRequestAuthor | null;
   state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
 };
 
 type PullRequestNode = {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+  author: PullRequestOwner | null;
   updatedAt: string;
   reviews: { nodes: PullRequestReview[]; };
 };
+
+type ReviewerStat = Omit<ReviewedPullRequestStat, "author">;
 
 type PullRequestPage = {
   nodes: PullRequestNode[];
@@ -29,6 +51,11 @@ const reviewedPullRequestsQuery = `
       pullRequests(states: MERGED, first: $first, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
         pageInfo { hasNextPage endCursor }
         nodes {
+          number
+          title
+          url
+          mergedAt
+          author { login avatarUrl ... on User { name } }
           updatedAt
           reviews(first: 100) {
             nodes {
@@ -71,7 +98,7 @@ export const getReviewedPullRequests = async (repository: string, range: PrRange
     after = !limit && hasPrsInRange && page.pageInfo.hasNextPage ? page.pageInfo.endCursor ?? undefined : undefined;
   } while (after);
 
-  const stats = new Map<string, { name: string | null; comments: number; approvals: number; }>();
+  const stats = new Map<string, ReviewerStat>();
   for (const pull of pulls) {
     const commenters = new Map<string, string | null>();
     const approvers = new Map<string, string | null>();
@@ -82,14 +109,22 @@ export const getReviewedPullRequests = async (repository: string, range: PrRange
       if (review.state === "COMMENTED" || review.state === "CHANGES_REQUESTED") commenters.set(review.author.login, review.author.name ?? null);
     }
 
-    for (const [author, name] of commenters) {
-      const stat = stats.get(author) ?? { name, comments: 0, approvals: 0 };
-      stat.comments += 1;
-      stats.set(author, stat);
-    }
-    for (const [author, name] of approvers) {
-      const stat = stats.get(author) ?? { name, comments: 0, approvals: 0 };
-      stat.approvals += 1;
+    const reviewers = new Map([...commenters, ...approvers]);
+    for (const [author, name] of reviewers) {
+      const commented = commenters.has(author);
+      const approved = approvers.has(author);
+      const stat = stats.get(author) ?? { name, comments: 0, approvals: 0, pulls: [] };
+      if (commented) stat.comments += 1;
+      if (approved) stat.approvals += 1;
+      stat.pulls.push({
+        number: pull.number,
+        title: pull.title,
+        url: pull.url,
+        mergedAt: pull.mergedAt,
+        author: pull.author,
+        commented,
+        approved,
+      });
       stats.set(author, stat);
     }
   }

@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { GitHubCliError } from "../client/githubGraphql";
 import { useViewerQuery } from "../client/queries/useViewerQuery";
 import { UserIcon } from "../assets/UserIcon";
+import glasses from "../assets/3d-glasses.png";
 import { Repo } from "./Repo";
 
 const Avatar = () => {
@@ -48,7 +49,7 @@ const Avatar = () => {
 export const Nav = () => (
   <div class="navbar bg-neutral text-neutral-content px-10">
     <div class="flex flex-1 items-center gap-3 text-xl">
-      <img src="/3d-glasses.png" alt="" class="circle-icon" />
+      <img src={glasses} alt="" class="circle-icon" />
       <span>Retro Specs</span>
     </div>
 
